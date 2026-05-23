@@ -12,6 +12,7 @@ pub fn build(b: *std.Build) void {
         .os_tag = .freestanding,
         .abi = .ilp32,
 
+        .cpu_features_add = riscv.featureSet(&.{.reserve_x27}),
         .cpu_features_sub = riscv.featureSet(&.{ .f, .d }),
     });
 
