@@ -41,10 +41,10 @@ pub fn build(b: *std.Build) void {
     });
 
     mod.addCSourceFiles(.{
-        .root = b.path("."),
+        .root = b.path("src"),
         .files = &.{
-            "src/main.S",
-            "src/start.S",
+            "main.S",
+            "start.S",
         },
         .flags = &.{
             "-march=rv32i",
