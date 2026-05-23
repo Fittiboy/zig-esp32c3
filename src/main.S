@@ -1,6 +1,6 @@
-    .section .text
-    .globl main
-    .type main, @function
+.section .text.main, "ax", @progbits
+.globl main
+.type main, @function
 
 main:
     li a0, 10
