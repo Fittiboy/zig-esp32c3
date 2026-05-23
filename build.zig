@@ -128,9 +128,9 @@ pub fn build(b: *std.Build) void {
     gdb_cmd.addFileArg(elf_path);
     gdb.dependOn(&gdb_cmd.step);
 
-    const clean = b.step("clean", "Cleans the build directory");
+    const clean = b.step("clean", "Cleans the build directory and the cache to free space");
     const clean_cmd = b.addSystemCommand(&.{
-        "rm", "-rf", "zig-out",
+        "rm", "-rf", "zig-out", ".zig-cache",
     });
     clean.dependOn(&clean_cmd.step);
 }
