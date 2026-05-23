@@ -148,4 +148,10 @@ pub fn build(b: *std.Build) void {
     const gdb_cmd = b.addSystemCommand(&.{"riscv32-elf-gdb"});
     gdb_cmd.addFileArg(elf_path);
     gdb.dependOn(&gdb_cmd.step);
+
+    const clean = b.step("clean", "Cleans the build directory");
+    const clean_cmd = b.addSystemCommand(&.{
+        "rm", "-rf", "zig-out",
+    });
+    clean.dependOn(&clean_cmd.step);
 }
