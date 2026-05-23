@@ -10,10 +10,10 @@ pub fn build(b: *std.Build) void {
     const target = b.resolveTargetQuery(.{
         .cpu_arch = .riscv32,
         .os_tag = .freestanding,
-        .abi = .ilp32,
+        .abi = .none,
 
+        .cpu_model = .{ .explicit = &riscv.cpu.generic_rv32 },
         .cpu_features_add = riscv.featureSet(&.{.reserve_x27}),
-        .cpu_features_sub = riscv.featureSet(&.{ .f, .d }),
     });
 
     const optimize = b.standardOptimizeOption(.{
