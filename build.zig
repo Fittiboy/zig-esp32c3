@@ -20,21 +20,9 @@ pub fn build(b: *std.Build) void {
         .preferred_optimize_mode = .Debug,
     });
 
-    const fib_mod = b.createModule(.{
-        .root_source_file = b.path("src/fib.zig"),
-        .target = target,
-        .optimize = .ReleaseSmall,
-        .single_threaded = true,
-    });
-
-    const fib_obj = b.addObject(.{
-        .name = "fib",
-        .root_module = fib_mod,
-    });
-
-    fib_obj.bundle_compiler_rt = false;
-
     const mod = b.createModule(.{
+        .root_source_file = b.path("src/root.zig"),
+        .sanitize_c = .off,
         .target = target,
         .optimize = optimize,
         .single_threaded = true,
@@ -48,15 +36,10 @@ pub fn build(b: *std.Build) void {
         },
         .flags = &.{
             "-march=rv32i",
-            "-mabi=ilp32",
             "-mno-relax",
             "-ffreestanding",
-            "-Wall",
-            "-Wextra",
         },
     });
-
-    mod.addObjectFile(fib_obj.getEmittedBin());
 
     const elf = b.addExecutable(.{
         .name = target_name,
