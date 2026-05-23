@@ -16,15 +16,11 @@ pub fn build(b: *std.Build) void {
         .cpu_features_add = riscv.featureSet(&.{.reserve_x27}),
     });
 
-    const optimize = b.standardOptimizeOption(.{
-        .preferred_optimize_mode = .Debug,
-    });
-
     const mod = b.createModule(.{
         .root_source_file = b.path("src/root.zig"),
         .sanitize_c = .off,
         .target = target,
-        .optimize = optimize,
+        .optimize = b.standardOptimizeOption(.{}),
         .single_threaded = true,
     });
 
