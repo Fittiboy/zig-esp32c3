@@ -97,6 +97,7 @@ pub fn build(b: *std.Build) void {
     });
     flash_cmd.addFileArg(boot_bin);
     flash.dependOn(&flash_cmd.step);
+    flash.dependOn(install_step);
 
     const run = b.step("run", "Load image into RAM with esptool");
     const run_cmd = b.addSystemCommand(&.{
@@ -106,6 +107,7 @@ pub fn build(b: *std.Build) void {
     });
     run_cmd.addFileArg(boot_bin);
     run.dependOn(&run_cmd.step);
+    run.dependOn(install_step);
 
     const disasm = b.step("disasm", "Disassemble text binary");
     const disasm_cmd = b.addSystemCommand(&.{
@@ -116,6 +118,7 @@ pub fn build(b: *std.Build) void {
     });
     disasm_cmd.addFileArg(text_bin);
     disasm.dependOn(&disasm_cmd.step);
+    disasm.dependOn(install_step);
 
     const openocd = b.step("openocd", "Launch OpenOCD server on target");
     const openocd_cmd = b.addSystemCommand(&.{
@@ -127,6 +130,7 @@ pub fn build(b: *std.Build) void {
     const gdb_cmd = b.addSystemCommand(&.{"riscv32-elf-gdb"});
     gdb_cmd.addFileArg(elf_path);
     gdb.dependOn(&gdb_cmd.step);
+    gdb.dependOn(install_step);
 
     const clean = b.step("clean", "Cleans the build directory and the cache to free space");
     const clean_cmd = b.addSystemCommand(&.{
