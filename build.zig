@@ -64,19 +64,19 @@ pub fn build(b: *std.Build) void {
     // output, and the only file required for flashing.
     // It is created from the `elf` artifact above.
     const boot = b.addSystemCommand(&.{
-        "esptool",   "--chip",   "esp32c3",
-        "elf2image", "--output",
+        "esptool",      "--chip",
+        "esp32c3",      "elf2image",
+        "--flash-mode", "dio",
+        "--flash-freq", "40m",
+        "--output",
     });
     const boot_bin = boot.addOutputFileArg(boot_name);
     boot.addFileArg(elf_path);
 
     // Disassembly of the final non-bootable binary
     const lst = b.addSystemCommand(&.{
-        "riscv64-elf-objdump",
-        "-d",
-        "-S",
-        "-M",
-        "no-aliases",
+        "riscv64-elf-objdump", "-d",         "-S",
+        "-M",                  "no-aliases",
     });
     lst.addFileArg(elf_path);
     const listing = lst.captureStdOut(.{});
@@ -96,21 +96,16 @@ pub fn build(b: *std.Build) void {
 
     const flash = b.step("flash", "Flash ESP32-C3 image");
     const flash_cmd = b.addSystemCommand(&.{
-        "esptool", "--chip", "esp32c3",
-        "--port",  port,     "write-flash",
-        "0x10000",
+        "esptool",      "--chip",
+        "esp32c3",      "--port",
+        port,           "write-flash",
+        "--flash-mode", "dio",
+        "--flash-freq", "40m",
+        "--flash-size", "detect",
+        "0x0",
     });
     flash_cmd.addFileArg(boot_bin);
     flash.dependOn(&flash_cmd.step);
-
-    const run = b.step("run", "Load image into RAM with esptool");
-    const run_cmd = b.addSystemCommand(&.{
-        "esptool",  "--chip", "esp32c3",
-        "--port",   port,     "--no-stub",
-        "load-ram",
-    });
-    run_cmd.addFileArg(boot_bin);
-    run.dependOn(&run_cmd.step);
 
     const openocd = b.step("openocd", "Launch OpenOCD server on target");
     const openocd_cmd = b.addSystemCommand(&.{
