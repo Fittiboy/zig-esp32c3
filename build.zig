@@ -4,8 +4,23 @@ pub fn build(b: *std.Build) void {
     const riscv = std.Target.riscv;
 
     var install_step = b.getInstallStep();
-    const target_name = "lab";
-    const port = b.option([]const u8, "port", "serial port") orelse "/dev/ttyACM0";
+
+    // Output files will be `[base_name].bin` etc.
+    const base_name = b.option(
+        []const u8,
+        "name",
+        "The base name of the output files (default: \"lab\")",
+    ) orelse "lab";
+
+    const boot_name = b.fmt("{s}.bin", .{base_name});
+    const list_name = b.fmt("{s}.lst", .{base_name});
+
+    // Required only for the flash and run steps.
+    const port = b.option(
+        []const u8,
+        "port",
+        "Serial port for connecting to the board (default: /dev/ttyACM0)",
+    ) orelse "/dev/ttyACM0";
 
     const target = b.resolveTargetQuery(.{
         .cpu_arch = .riscv32,
@@ -13,36 +28,31 @@ pub fn build(b: *std.Build) void {
         .abi = .none,
 
         .cpu_model = .{ .explicit = &riscv.cpu.generic_rv32 },
+        // By personal convention, the x27 register, or s11,
+        // is used as a heap pointer, growing up toward the stack.
         .cpu_features_add = riscv.featureSet(&.{.reserve_x27}),
     });
 
     const mod = b.createModule(.{
         .root_source_file = b.path("src/root.zig"),
-        .sanitize_c = .off,
         .target = target,
         .optimize = b.standardOptimizeOption(.{}),
         .single_threaded = true,
+        // Inclusion of Assembly files would otherwise cause
+        // the build to fail, trying to use ubsan.
+        .sanitize_c = .off,
     });
 
-    mod.addCSourceFiles(.{
-        .root = b.path("src"),
-        .files = &.{
-            "main.S",
-            "start.S",
-        },
-        .flags = &.{
-            "-march=rv32i",
-            "-mno-relax",
-            "-ffreestanding",
-        },
-    });
+    mod.addAssemblyFile(b.path("src/main.s"));
+    mod.addAssemblyFile(b.path("src/start.s"));
 
     const elf = b.addExecutable(.{
-        .name = target_name,
+        .name = base_name,
         .root_module = mod,
     });
 
     elf.setLinkerScript(b.path("linker.ld"));
+    // This symbol is found in `src/start.s`.
     elf.entry = .{ .symbol_name = "_start" };
     elf.bundle_compiler_rt = false;
 
@@ -50,44 +60,39 @@ pub fn build(b: *std.Build) void {
 
     const elf_path = elf.getEmittedBin();
 
+    // The bootable binary is the final executable
+    // output, and the only file required for flashing.
+    // It is created from the `elf` artifact above.
     const boot = b.addSystemCommand(&.{
         "esptool",   "--chip",   "esp32c3",
         "elf2image", "--output",
     });
-    const boot_bin = boot.addOutputFileArg("lab.bin");
+    const boot_bin = boot.addOutputFileArg(boot_name);
     boot.addFileArg(elf_path);
 
-    const raw = b.addSystemCommand(&.{ "zig", "objcopy", "-O", "binary" });
-    raw.addFileArg(elf_path);
-    const raw_bin = raw.addOutputFileArg("lab.raw.bin");
-
-    const text = b.addSystemCommand(&.{
-        "zig", "objcopy",
-        "-O",  "binary",
-        "-j",  ".init",
-        "-j",  ".text",
-    });
-    text.addFileArg(elf_path);
-    const text_bin = text.addOutputFileArg("lab.text.bin");
-
+    // Disassembly of the final non-bootable binary
     const lst = b.addSystemCommand(&.{
         "riscv64-elf-objdump",
         "-d",
         "-S",
         "-M",
-        "no-aliases,numeric",
+        "no-aliases",
     });
     lst.addFileArg(elf_path);
     const listing = lst.captureStdOut(.{});
 
-    var install_bin = b.addInstallFile(boot_bin, "lab.bin");
-    var install_raw = b.addInstallFile(raw_bin, "lab.raw.bin");
-    var install_text = b.addInstallFile(text_bin, "lab.text.bin");
-    var install_listing = b.addInstallFile(listing, "lab.lst");
+    // -------------------
+    // Installed Artifacts
+    // -------------------
+
+    var install_bin = b.addInstallFile(boot_bin, boot_name);
+    var install_listing = b.addInstallFile(listing, list_name);
     install_step.dependOn(&install_bin.step);
-    install_step.dependOn(&install_raw.step);
-    install_step.dependOn(&install_text.step);
     install_step.dependOn(&install_listing.step);
+
+    // -----------
+    // Build Steps
+    // -----------
 
     const flash = b.step("flash", "Flash ESP32-C3 image");
     const flash_cmd = b.addSystemCommand(&.{
@@ -97,7 +102,6 @@ pub fn build(b: *std.Build) void {
     });
     flash_cmd.addFileArg(boot_bin);
     flash.dependOn(&flash_cmd.step);
-    flash.dependOn(install_step);
 
     const run = b.step("run", "Load image into RAM with esptool");
     const run_cmd = b.addSystemCommand(&.{
@@ -107,18 +111,6 @@ pub fn build(b: *std.Build) void {
     });
     run_cmd.addFileArg(boot_bin);
     run.dependOn(&run_cmd.step);
-    run.dependOn(install_step);
-
-    const disasm = b.step("disasm", "Disassemble text binary");
-    const disasm_cmd = b.addSystemCommand(&.{
-        "riscv64-elf-objdump", "-D",
-        "-b",                  "binary",
-        "-m",                  "riscv:rv32",
-        "-M",                  "no-aliases,numeric",
-    });
-    disasm_cmd.addFileArg(text_bin);
-    disasm.dependOn(&disasm_cmd.step);
-    disasm.dependOn(install_step);
 
     const openocd = b.step("openocd", "Launch OpenOCD server on target");
     const openocd_cmd = b.addSystemCommand(&.{
@@ -126,15 +118,8 @@ pub fn build(b: *std.Build) void {
     });
     openocd.dependOn(&openocd_cmd.step);
 
-    const gdb = b.step("gdb", "Open GDB on ELF");
+    const gdb = b.step("gdb", "Run GDB with the emitted ELF");
     const gdb_cmd = b.addSystemCommand(&.{"riscv32-elf-gdb"});
     gdb_cmd.addFileArg(elf_path);
     gdb.dependOn(&gdb_cmd.step);
-    gdb.dependOn(install_step);
-
-    const clean = b.step("clean", "Cleans the build directory and the cache to free space");
-    const clean_cmd = b.addSystemCommand(&.{
-        "rm", "-rf", "zig-out", ".zig-cache",
-    });
-    clean.dependOn(&clean_cmd.step);
 }
