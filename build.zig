@@ -64,11 +64,14 @@ pub fn build(b: *std.Build) void {
     // output, and the only file required for flashing.
     // It is created from the `elf` artifact above.
     const boot = b.addSystemCommand(&.{
-        "esptool",      "--chip",
-        "esp32c3",      "elf2image",
+        // zig fmt: off
+        "esptool",
+        "--chip",       "esp32c3",
+        "elf2image",
         "--flash-mode", "dio",
         "--flash-freq", "40m",
         "--output",
+        // zig fmt: on
     });
     const boot_bin = boot.addOutputFileArg(boot_name);
     boot.addFileArg(elf_path);
@@ -96,13 +99,16 @@ pub fn build(b: *std.Build) void {
 
     const flash = b.step("flash", "Flash ESP32-C3 image");
     const flash_cmd = b.addSystemCommand(&.{
-        "esptool",      "--chip",
-        "esp32c3",      "--port",
-        port,           "write-flash",
+        // zig fmt: off
+        "esptool",
+        "--chip",       "esp32c3",
+        "--port",       port,
+        "write-flash",
         "--flash-mode", "dio",
         "--flash-freq", "40m",
         "--flash-size", "detect",
         "0x0",
+        // zig fmt: on
     });
     flash_cmd.addFileArg(boot_bin);
     flash.dependOn(&flash_cmd.step);
