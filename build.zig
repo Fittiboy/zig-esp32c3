@@ -120,7 +120,7 @@ pub fn build(b: *std.Build) void {
     openocd.dependOn(&openocd_cmd.step);
 
     const gdb = b.step("gdb", "Run GDB with the emitted ELF");
-    const gdb_cmd = b.addSystemCommand(&.{"riscv32-elf-gdb"});
+    const gdb_cmd = b.addSystemCommand(&.{"riscv64-elf-gdb"});
     gdb_cmd.addFileArg(elf_path);
     gdb.dependOn(&gdb_cmd.step);
 }
